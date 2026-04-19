@@ -4,6 +4,8 @@ import { createAircraft, AIRCRAFT_SPECS } from './src/aircraft.js';
 import { Physics } from './src/physics.js';
 import { CameraRig } from './src/camera.js';
 import { HUD } from './src/hud.js';
+import { WeaponSystem } from './src/weapons.js';
+import { overlayRealSalzburg } from './src/realWorld.js';
 
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -22,6 +24,13 @@ scene.fog = new THREE.Fog(0x9dc7e8, 2000, 18000);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 40000);
 
 const world = buildSalzburg(scene);
+const weapons = new WeaponSystem(scene, world.groundAt);
+
+// Kick off real-Salzburg overlay (satellite + OSM buildings) in the background.
+overlayRealSalzburg(scene, world.groundAt, (msg) => {
+  const el = document.getElementById('hud-world');
+  if (el) el.textContent = msg;
+});
 
 // --- Aircraft state ---
 let currentType = 'eurofighter';
@@ -32,12 +41,11 @@ const physics = new Physics(aircraft);
 const cameraRig = new CameraRig(camera, aircraft.group);
 const hud = new HUD();
 
-// spawn over airport, heading south toward Alps
 function spawn() {
   physics.reset({
     position: new THREE.Vector3(-1200, 800, 3200),
     headingDeg: 170,
-    speed: 400 / 3.6, // 400 km/h in m/s
+    speed: 400 / 3.6,
     throttle: 0.6,
   });
 }
@@ -45,6 +53,8 @@ spawn();
 
 // --- Input ---
 const keys = new Set();
+const mouseBtn = { left: false, right: false };
+
 window.addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (e.code === 'KeyV') cameraRig.cycle();
@@ -55,6 +65,25 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') e.preventDefault();
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+// GTA5-style mouse: pointer lock on canvas click, mouse moves camera look
+canvas.addEventListener('click', () => {
+  if (running && document.pointerLockElement !== canvas) canvas.requestPointerLock();
+});
+document.addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement === canvas) {
+    cameraRig.applyMouseDelta(e.movementX, e.movementY);
+  }
+});
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 0) mouseBtn.left = true;
+  if (e.button === 2) mouseBtn.right = true;
+});
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 0) mouseBtn.left = false;
+  if (e.button === 2) mouseBtn.right = false;
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 function switchJet(type) {
   if (type === currentType) return;
@@ -82,6 +111,7 @@ document.querySelectorAll('.jet-card').forEach((btn) => {
     hudEl.classList.remove('hidden');
     running = true;
     last = performance.now();
+    canvas.requestPointerLock?.();
   });
 });
 
@@ -106,11 +136,13 @@ function frame(now) {
       throttleUp: keys.has('ShiftLeft') || keys.has('ShiftRight'),
       throttleDown: keys.has('ControlLeft') || keys.has('ControlRight'),
       brake: keys.has('Space'),
+      fireGun: mouseBtn.left,
+      fireMissile: mouseBtn.right,
     };
     physics.update(dt, input);
+    weapons.update(dt, physics, input);
     cameraRig.update(dt, physics);
     hud.update(physics);
-    // crash → reset
     if (physics.position.y < world.groundAt(physics.position.x, physics.position.z) + 3) {
       hud.flashCrash();
       spawn();
