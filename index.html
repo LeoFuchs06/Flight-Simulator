@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Salzburg Flight Simulator — Eurofighter · MiG-31 · MiG-25</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="splash">
+      <div class="panel">
+        <h1>Salzburg Flight Simulator</h1>
+        <p class="subtitle">Wähle deinen Abfangjäger</p>
+        <div class="aircraft-select">
+          <button class="jet-card" data-jet="eurofighter">
+            <span class="badge">EU · 🇪🇺</span>
+            <h2>Eurofighter Typhoon</h2>
+            <p>Canards · Delta · Mach 2.0</p>
+          </button>
+          <button class="jet-card" data-jet="mig31">
+            <span class="badge">RU · 🇷🇺</span>
+            <h2>MiG-31 Foxhound</h2>
+            <p>Schwerer Interceptor · Mach 2.83</p>
+          </button>
+          <button class="jet-card" data-jet="mig25">
+            <span class="badge">RU · 🇷🇺</span>
+            <h2>MiG-25 Foxbat</h2>
+            <p>Höhenabfangjäger · Mach 2.83</p>
+          </button>
+        </div>
+        <div class="controls-help">
+          <h3>Steuerung</h3>
+          <div class="grid">
+            <div><kbd>W</kbd>/<kbd>S</kbd> Nick (pitch)</div>
+            <div><kbd>A</kbd>/<kbd>D</kbd> Roll</div>
+            <div><kbd>Q</kbd>/<kbd>E</kbd> Gier (yaw)</div>
+            <div><kbd>Shift</kbd>/<kbd>Ctrl</kbd> Schub +/-</div>
+            <div><kbd>Space</kbd> Bremse</div>
+            <div><kbd>V</kbd> Kamera</div>
+            <div><kbd>R</kbd> Reset</div>
+            <div><kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> Jet wechseln</div>
+          </div>
+        </div>
+        <p class="hint">Klicke auf einen Jet zum Starten.</p>
+      </div>
+    </div>
+
+    <div id="hud" class="hidden">
+      <div class="hud-row top">
+        <div class="hud-box">
+          <span class="label">JET</span>
+          <span id="hud-jet">—</span>
+        </div>
+        <div class="hud-box">
+          <span class="label">VIEW</span>
+          <span id="hud-view">Chase</span>
+        </div>
+      </div>
+      <div class="hud-row left">
+        <div class="hud-box">
+          <span class="label">SPEED</span>
+          <span id="hud-speed">0</span><span class="unit"> km/h</span>
+        </div>
+        <div class="hud-box">
+          <span class="label">MACH</span>
+          <span id="hud-mach">0.00</span>
+        </div>
+      </div>
+      <div class="hud-row right">
+        <div class="hud-box">
+          <span class="label">ALT</span>
+          <span id="hud-alt">0</span><span class="unit"> m</span>
+        </div>
+        <div class="hud-box">
+          <span class="label">HDG</span>
+          <span id="hud-hdg">0</span><span class="unit">°</span>
+        </div>
+      </div>
+      <div class="hud-row bottom">
+        <div class="hud-box wide">
+          <span class="label">THROTTLE</span>
+          <div class="bar"><div id="hud-throttle-fill"></div></div>
+          <span id="hud-throttle">0%</span>
+        </div>
+      </div>
+      <div id="crosshair">+</div>
+    </div>
+
+    <canvas id="scene"></canvas>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

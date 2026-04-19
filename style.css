@@ -1,0 +1,69 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #000; color: #e0f2ff; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+canvas#scene { display: block; width: 100vw; height: 100vh; }
+
+.hidden { display: none !important; }
+
+#splash {
+  position: fixed; inset: 0; z-index: 10;
+  background: radial-gradient(circle at 50% 30%, #1a3b6b 0%, #061325 65%, #000 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+#splash .panel {
+  max-width: 960px; width: 100%;
+  background: rgba(6, 18, 35, 0.85);
+  border: 1px solid #1e5aa3;
+  border-radius: 14px;
+  padding: 36px;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+}
+#splash h1 {
+  font-size: 42px; letter-spacing: 2px;
+  background: linear-gradient(90deg, #9ad7ff, #ffffff, #9ad7ff);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-align: center;
+}
+#splash .subtitle { text-align: center; opacity: 0.7; margin: 8px 0 28px; font-size: 18px; }
+
+.aircraft-select { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.jet-card {
+  background: linear-gradient(160deg, rgba(30,90,163,0.35), rgba(10,30,60,0.5));
+  border: 1px solid #2c6fc3; border-radius: 10px; padding: 20px;
+  color: #e8f4ff; cursor: pointer; text-align: left;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.jet-card:hover { transform: translateY(-3px); border-color: #6fb2ff; box-shadow: 0 10px 30px rgba(80,160,255,0.25); }
+.jet-card h2 { font-size: 20px; margin: 10px 0 4px; }
+.jet-card p { font-size: 13px; opacity: 0.75; }
+.jet-card .badge { font-size: 11px; background: #0a2a52; padding: 3px 8px; border-radius: 20px; border: 1px solid #2c6fc3; }
+
+.controls-help { margin-top: 28px; padding-top: 20px; border-top: 1px solid #1e5aa3; }
+.controls-help h3 { margin-bottom: 12px; font-size: 14px; letter-spacing: 2px; opacity: 0.7; }
+.controls-help .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 13px; }
+kbd {
+  display: inline-block; padding: 2px 7px; background: #0a1f3e; border: 1px solid #2c6fc3;
+  border-radius: 4px; font-size: 12px; min-width: 22px; text-align: center;
+}
+.hint { text-align: center; margin-top: 20px; opacity: 0.55; font-size: 13px; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; font-family: 'Courier New', monospace; color: #9dffaa; text-shadow: 0 0 6px rgba(0,255,120,0.6); }
+.hud-row { position: absolute; display: flex; gap: 10px; }
+.hud-row.top { top: 18px; left: 50%; transform: translateX(-50%); }
+.hud-row.left { top: 50%; left: 24px; transform: translateY(-50%); flex-direction: column; }
+.hud-row.right { top: 50%; right: 24px; transform: translateY(-50%); flex-direction: column; align-items: flex-end; }
+.hud-row.bottom { bottom: 24px; left: 50%; transform: translateX(-50%); flex-direction: column; align-items: center; }
+.hud-box {
+  background: rgba(0, 20, 10, 0.45); border: 1px solid rgba(120,255,160,0.5);
+  border-radius: 6px; padding: 6px 12px; font-size: 15px; min-width: 110px; text-align: center;
+}
+.hud-box.wide { min-width: 260px; }
+.hud-box .label { display: block; font-size: 10px; opacity: 0.7; letter-spacing: 2px; }
+.hud-box .unit { opacity: 0.6; font-size: 12px; }
+.bar { width: 230px; height: 8px; background: rgba(120,255,160,0.15); border: 1px solid rgba(120,255,160,0.4); border-radius: 4px; margin: 6px auto 3px; overflow: hidden; }
+#hud-throttle-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #50ff90, #ffef40, #ff6060); transition: width 0.1s; }
+#crosshair {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: rgba(120,255,160,0.7); font-size: 28px; font-weight: bold;
+}
