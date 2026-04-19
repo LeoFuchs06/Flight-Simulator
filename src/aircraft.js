@@ -1,4 +1,22 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const GLB_SCALE = { eurofighter: 1.0, mig31: 1.0, mig25: 1.0 };
+const _glbCache = new Map();
+const _loader = new GLTFLoader();
+
+async function tryLoadGLB(type) {
+  if (_glbCache.has(type)) return _glbCache.get(type);
+  const url = `assets/${type}.glb`;
+  const head = await fetch(url, { method: 'HEAD' }).catch(() => null);
+  if (!head || !head.ok) { _glbCache.set(type, null); return null; }
+  return new Promise((resolve) => {
+    _loader.load(url, (gltf) => {
+      _glbCache.set(type, gltf.scene);
+      resolve(gltf.scene);
+    }, undefined, () => { _glbCache.set(type, null); resolve(null); });
+  });
+}
 
 export const AIRCRAFT_SPECS = {
   eurofighter: {
@@ -43,6 +61,16 @@ export function createAircraft(type) {
 
   group.userData.afterburnerMaterials = afterburners;
   group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+
+  // Try to swap in a real .glb model if present under assets/<type>.glb
+  tryLoadGLB(type).then((scene) => {
+    if (!scene) return;
+    for (let i = group.children.length - 1; i >= 0; i--) group.remove(group.children[i]);
+    const inst = scene.clone(true);
+    inst.scale.setScalar(GLB_SCALE[type] ?? 1);
+    inst.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    group.add(inst);
+  });
 
   return {
     group,

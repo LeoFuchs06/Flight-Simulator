@@ -87,10 +87,11 @@ export class Physics {
       accel.addScaledVector(this.velocity, -dragMag / v);
     }
 
-    // Lift perpendicular to velocity in the direction of aircraft "up"
-    // Lift magnitude ~ liftFactor * v² * 0.001
-    const liftMag = spec.liftFactor * v * v * 0.001;
-    accel.addScaledVector(this._up, liftMag);
+    // Lift along aircraft's local up. Tuned so at stallSpeed lift ≈ gravity
+    // (level flight possible), clamped so high speed doesn't rocket away.
+    const vRatio = Math.max(0, this.speed) / spec.stallSpeed;
+    const liftScale = Math.min(vRatio * vRatio, 1.45);
+    accel.addScaledVector(this._up, GRAVITY * liftScale);
 
     // Gravity
     accel.y -= GRAVITY;
