@@ -107,10 +107,13 @@ function makeExhaust(radius, length, nozzleColor = 0x1a1a1a) {
   );
   nozzle.rotation.x = Math.PI / 2;
   g.add(nozzle);
-  const burnerMat = new THREE.MeshBasicMaterial({ color: 0xff6020, transparent: true, opacity: 0.85 });
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.8, length * 2.2, 14), burnerMat);
+  const burnerMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(2.5, 0.8, 0.25),
+    transparent: true, opacity: 0.9, toneMapped: false, depthWrite: false,
+  });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.85, length * 2.6, 16), burnerMat);
   flame.rotation.x = -Math.PI / 2;
-  flame.position.z = -length * 1.1;
+  flame.position.z = -length * 1.25;
   g.add(flame);
   return { group: g, flameMat: burnerMat };
 }
@@ -394,8 +397,11 @@ function buildMig31() {
     );
     exhaustHousing.position.set(side * 0.9, -0.1, -9.3);
     g.add(exhaustHousing);
-    const flameMat = new THREE.MeshBasicMaterial({ color: 0xff7030, transparent: true, opacity: 0.85 });
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3.5, 12), flameMat);
+    const flameMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(2.8, 0.9, 0.3),
+      transparent: true, opacity: 0.9, toneMapped: false, depthWrite: false,
+    });
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.65, 4.0, 14), flameMat);
     flame.rotation.x = -Math.PI / 2;
     flame.position.set(side * 0.9, -0.1, -11.5);
     g.add(flame);

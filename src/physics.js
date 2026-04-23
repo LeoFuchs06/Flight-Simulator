@@ -105,16 +105,15 @@ export class Physics {
 
     this._apply();
 
-    // Afterburner emissive pulse
+    // Afterburner HDR pulse (values > 1 drive bloom pass)
     const ab = this.aircraft.group.userData.afterburnerMaterials;
     if (ab) {
-      const intensity = 0.3 + this.throttle * 1.2;
+      const hi = this.throttle;
+      const boost = 1.2 + hi * 3.2;
       for (const mat of ab) {
-        mat.opacity = 0.35 + this.throttle * 0.55;
+        mat.opacity = 0.3 + hi * 0.65;
         if (mat.color) {
-          // shift hue from dull orange (low throttle) to bright white-yellow (high)
-          const hi = this.throttle;
-          mat.color.setRGB(1, 0.4 + hi * 0.5, 0.1 + hi * 0.5);
+          mat.color.setRGB(boost, boost * (0.35 + hi * 0.45), boost * (0.12 + hi * 0.32));
         }
       }
     }

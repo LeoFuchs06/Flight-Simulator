@@ -6,27 +6,49 @@ import { CameraRig } from './src/camera.js';
 import { HUD } from './src/hud.js';
 import { WeaponSystem } from './src/weapons.js';
 import { overlayRealSalzburg } from './src/realWorld.js';
+import { buildSky } from './src/sky.js';
+import { buildComposer } from './src/postfx.js';
+import { Contrails } from './src/contrails.js';
+import { EngineAudio, SfxAudio } from './src/audio.js';
 
 const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87c9ff);
-scene.fog = new THREE.Fog(0x9dc7e8, 2000, 18000);
+scene.fog = new THREE.Fog(0xb8d0e5, 3000, 22000);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 40000);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 50000);
 
+const skyInfo = buildSky(scene);
 const world = buildSalzburg(scene);
-const weapons = new WeaponSystem(scene, world.groundAt);
 
-// Kick off real-Salzburg overlay (satellite + OSM buildings) in the background.
+// Align the scene's directional sun with the Sky shader's sun.
+scene.traverse((o) => {
+  if (o.isDirectionalLight) {
+    o.position.copy(skyInfo.sunDirection).multiplyScalar(6000);
+    o.target.position.set(0, 0, 0);
+    o.target.updateMatrixWorld();
+  }
+});
+
+// Post-processing pipeline
+const pfx = buildComposer(renderer, scene, camera);
+
+// Audio (starts on first user interaction)
+const engineAudio = new EngineAudio();
+const sfx = new SfxAudio(engineAudio);
+
+const weapons = new WeaponSystem(scene, world.groundAt, sfx);
+const contrails = new Contrails(scene);
+
+// Real Salzburg overlay (async; procedural fallback on failure)
 overlayRealSalzburg(scene, world.groundAt, (msg) => {
   const el = document.getElementById('hud-world');
   if (el) el.textContent = msg;
@@ -66,9 +88,9 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 
-// GTA5-style mouse: pointer lock on canvas click, mouse moves camera look
-canvas.addEventListener('click', () => {
+canvas.addEventListener('click', async () => {
   if (running && document.pointerLockElement !== canvas) canvas.requestPointerLock();
+  await engineAudio.start();
 });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === canvas) {
@@ -99,11 +121,10 @@ function switchJet(type) {
   hud.setJetName(AIRCRAFT_SPECS[type].displayName);
 }
 
-// --- Splash selection ---
 const splash = document.getElementById('splash');
 const hudEl = document.getElementById('hud');
 document.querySelectorAll('.jet-card').forEach((btn) => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     const type = btn.dataset.jet;
     switchJet(type);
     hud.setJetName(AIRCRAFT_SPECS[type].displayName);
@@ -111,15 +132,17 @@ document.querySelectorAll('.jet-card').forEach((btn) => {
     hudEl.classList.remove('hidden');
     running = true;
     last = performance.now();
+    await engineAudio.start();
     canvas.requestPointerLock?.();
   });
 });
 
-// --- Resize ---
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
+  pfx.resize(w, h);
 });
 
 // --- Loop ---
@@ -141,15 +164,26 @@ function frame(now) {
     };
     physics.update(dt, input);
     weapons.update(dt, physics, input);
+    contrails.update(dt, physics, world.groundAt);
     cameraRig.update(dt, physics);
     hud.update(physics);
+    engineAudio.update(dt, physics.throttle, physics.speed);
+
+    // Speed-based FOV punch (subtle "hyperspeed" feel)
+    const baseFov = cameraRig.mode === 'cockpit' ? 80 : 70;
+    const extra = Math.min(12, Math.max(0, physics.speed - 120) / 40);
+    const targetFov = baseFov + extra;
+    camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 3);
+    camera.updateProjectionMatrix();
+
     if (physics.position.y < world.groundAt(physics.position.x, physics.position.z) + 3) {
       hud.flashCrash();
+      sfx.playExplosion();
       spawn();
     }
   }
   world.animate(dt);
-  renderer.render(scene, camera);
+  pfx.composer.render();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
