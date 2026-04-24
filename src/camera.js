@@ -1,23 +1,31 @@
 import * as THREE from 'three';
 
-const MODES = ['chase', 'cockpit', 'orbit'];
-const LABELS = { chase: 'Chase', cockpit: 'Cockpit', orbit: 'Orbit' };
-const LOOK_SENS = 0.0022;
-const LOOK_RECENTER = 2.5; // rad/s back-to-zero when no input
+const MODES  = ['chase', 'cockpit', 'orbit'];
+const LABELS = { chase: 'Locked', cockpit: 'Cockpit', orbit: 'Orbit' };
+
+// Tail cam offset (aircraft local space)
+const CAM_DIST   = 24;   // Meter hinter dem Heck
+const CAM_HEIGHT =  6;   // Meter über dem Zentrum
+
+// Cockpit
+const COCKPIT_SENS = 0.003;
+const AUTO_CENTER  = 1.5;   // Sekunden bis Auto-Zentrierung
+
+// Konvertierung: Flugzeug nutzt +Z=forward, Kamera schaut entlang -Z.
+// 180° um Y dreht die Kamera so, dass -Z auf das +Z des Flugzeugs zeigt.
+const Y_FLIP = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
 export class CameraRig {
   constructor(camera, target) {
-    this.camera = camera;
-    this.target = target;
-    this.mode = 'chase';
-    this._orbitAngle = 0;
-    this._offset = new THREE.Vector3();
-    this._tmp = new THREE.Vector3();
-    this._lookAt = new THREE.Vector3();
-    this._defaultFov = camera.fov;
-    this._yaw = 0;     // mouse-driven yaw relative to aircraft
-    this._pitch = 0;   // mouse-driven pitch
-    this._activeLook = false;
+    this.camera  = camera;
+    this.target  = target;
+    this.mode    = 'chase';
+    this._orbitAngle   = 0;
+    this._defaultFov   = camera.fov;
+    this._cockpitYaw   = 0;
+    this._cockpitPitch = 0;
+    this._noInputTimer = 0;
+    this._hasInput     = false;
     this._updateHUD();
   }
 
@@ -26,12 +34,8 @@ export class CameraRig {
   cycle() {
     const i = MODES.indexOf(this.mode);
     this.mode = MODES[(i + 1) % MODES.length];
-    if (this.mode !== 'cockpit') {
-      this.camera.fov = this._defaultFov;
-      this.camera.updateProjectionMatrix();
-    }
-    this._yaw = 0;
-    this._pitch = 0;
+    this.camera.fov = this._defaultFov;
+    this.camera.updateProjectionMatrix();
     this._updateHUD();
   }
 
@@ -40,76 +44,81 @@ export class CameraRig {
     if (el) el.textContent = LABELS[this.mode];
   }
 
-  // GTA5-style: mouse moves while pointer locked → rotate look offset
   applyMouseDelta(dx, dy) {
-    this._activeLook = true;
-    this._yaw -= dx * LOOK_SENS;
-    this._pitch -= dy * LOOK_SENS;
-    this._pitch = THREE.MathUtils.clamp(this._pitch, -1.1, 1.1);
-    const maxYaw = this.mode === 'cockpit' ? Math.PI : Math.PI * 0.95;
-    this._yaw = THREE.MathUtils.clamp(this._yaw, -maxYaw, maxYaw);
-  }
-
-  // Call each frame when no mouse movement occurred to drift back to center
-  _decayLook(dt) {
-    if (this._activeLook) { this._activeLook = false; return; }
-    const decay = LOOK_RECENTER * dt;
-    this._yaw = this._approach(this._yaw, 0, decay);
-    this._pitch = this._approach(this._pitch, 0, decay);
-  }
-  _approach(v, target, step) {
-    if (v > target) return Math.max(target, v - step);
-    return Math.min(target, v + step);
+    if (this.mode !== 'cockpit') return;
+    this._hasInput     = true;
+    this._cockpitYaw   = THREE.MathUtils.clamp(this._cockpitYaw   - dx * COCKPIT_SENS, -Math.PI, Math.PI);
+    this._cockpitPitch = THREE.MathUtils.clamp(this._cockpitPitch - dy * COCKPIT_SENS, -1.2, 1.2);
   }
 
   update(dt, physics) {
     if (!this.target) return;
-    this._decayLook(dt);
-    if (this.mode === 'chase') this._chase(dt);
-    else if (this.mode === 'cockpit') this._cockpit();
-    else if (this.mode === 'orbit') this._orbit(dt);
+    if (this._hasInput) { this._noInputTimer = 0; this._hasInput = false; }
+    else                  this._noInputTimer += dt;
+
+    if      (this.mode === 'chase')   this._chase();
+    else if (this.mode === 'cockpit') this._cockpit(dt);
+    else if (this.mode === 'orbit')   this._orbit(dt);
   }
 
-  _chase(dt) {
-    // Desired offset behind/above jet, then rotated by mouse yaw/pitch
-    const base = new THREE.Vector3(0, 5, -22);
-    const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this._yaw);
-    const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this._pitch);
-    base.applyQuaternion(yawQ).applyQuaternion(pitchQ);
-    this._offset.copy(base).applyQuaternion(this.target.quaternion);
-    const desired = this._tmp.copy(this.target.position).add(this._offset);
-    const lerp = 1 - Math.pow(0.0008, dt);
-    this.camera.position.lerp(desired, Math.min(1, lerp));
-    this._lookAt.copy(this.target.position).add(
-      new THREE.Vector3(0, 2, 12).applyQuaternion(this.target.quaternion)
-    );
-    this.camera.lookAt(this._lookAt);
+  // ── STARRE HECK-KAMERA ───────────────────────────────────────────────────────
+  // Kein Lerp, kein Damping, kein Spring-Arm.
+  // Kamera wird frame-genau als Slave des Flugzeug-Quaternions gesetzt.
+  _chase() {
+    const q = this.target.quaternion;
+
+    // 1. Position: fester Offset hinter + über dem Flugzeug (Aircraft Local → World)
+    this.camera.position
+      .set(0, CAM_HEIGHT, -CAM_DIST)
+      .applyQuaternion(q)
+      .add(this.target.position);
+
+    // 2. Rotation: Flugzeug-Quaternion direkt übernehmen + 180° Y-Flip.
+    //    Bewirkt: Kamera-(-Z) zeigt auf Flugzeugnase (+Z).
+    //    Roll, Pitch, Yaw werden zu 100% übertragen – kein Abdämpfen.
+    this.camera.quaternion.copy(q).multiply(Y_FLIP);
   }
 
-  _cockpit() {
-    if (this.camera.fov !== 80) {
+  // ── COCKPIT ──────────────────────────────────────────────────────────────────
+  _cockpit(dt) {
+    const alpha = (s) => 1 - Math.exp(-s * dt);
+
+    if (Math.abs(this.camera.fov - 80) > 0.1) {
       this.camera.fov = 80;
       this.camera.updateProjectionMatrix();
     }
+
+    if (this._noInputTimer > AUTO_CENTER) {
+      const d = alpha(2.5);
+      this._cockpitYaw   -= this._cockpitYaw   * d;
+      this._cockpitPitch -= this._cockpitPitch * d;
+    }
+
     const seat = new THREE.Vector3(0, 1.1, 4.2).applyQuaternion(this.target.quaternion);
     this.camera.position.copy(this.target.position).add(seat);
-    // View direction: forward rotated by mouse yaw/pitch
-    const look = new THREE.Vector3(0, 0, 100);
-    const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this._yaw);
-    const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this._pitch);
-    look.applyQuaternion(yawQ).applyQuaternion(pitchQ).applyQuaternion(this.target.quaternion);
-    this._lookAt.copy(this.camera.position).add(look);
-    this.camera.lookAt(this._lookAt);
+
+    const lookDir = new THREE.Vector3(0, 0, 100)
+      .applyQuaternion(
+        new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(this._cockpitPitch, this._cockpitYaw, 0, 'YXZ')
+        )
+      )
+      .applyQuaternion(this.target.quaternion);
+
+    this.camera.up.set(0, 1, 0).applyQuaternion(this.target.quaternion);
+    this.camera.lookAt(this.camera.position.clone().add(lookDir));
   }
 
+  // ── ORBIT ────────────────────────────────────────────────────────────────────
   _orbit(dt) {
-    this._orbitAngle += dt * 0.25;
-    const r = 45;
+    this._orbitAngle += dt * 0.3;
+    const r = 60;
     this.camera.position.set(
-      this.target.position.x + Math.cos(this._orbitAngle + this._yaw) * r,
-      this.target.position.y + 15 + this._pitch * 20,
-      this.target.position.z + Math.sin(this._orbitAngle + this._yaw) * r,
+      this.target.position.x + Math.cos(this._orbitAngle) * r,
+      this.target.position.y + 20,
+      this.target.position.z + Math.sin(this._orbitAngle) * r,
     );
+    this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.target.position);
   }
 }

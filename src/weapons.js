@@ -17,6 +17,7 @@ export class WeaponSystem {
     this._explosions = [];
     this._gunTimer = 0;
     this._missileTimer = 0;
+    this.currentWeapon = 'gun'; // 'gun' or 'missile'
     this._tracerMat = new THREE.LineBasicMaterial({
       color: 0xfff2a0, transparent: true, opacity: 0.9,
     });
@@ -28,6 +29,10 @@ export class WeaponSystem {
     });
   }
 
+  cycleWeapon() {
+    this.currentWeapon = this.currentWeapon === 'gun' ? 'missile' : 'gun';
+  }
+
   update(dt, physics, input) {
     this._gunTimer = Math.max(0, this._gunTimer - dt);
     this._missileTimer = Math.max(0, this._missileTimer - dt);
@@ -36,12 +41,13 @@ export class WeaponSystem {
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(physics.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(physics.quaternion);
 
-    if (input.fireGun && this._gunTimer <= 0) {
+    // Fire only selected weapon
+    if (this.currentWeapon === 'gun' && input.fireGun && this._gunTimer <= 0) {
       this._gunTimer = GUN_RATE;
       this._spawnTracer(physics, fwd, right, up, +1);
       this._spawnTracer(physics, fwd, right, up, -1);
     }
-    if (input.fireMissile && this._missileTimer <= 0) {
+    if (this.currentWeapon === 'missile' && input.fireMissile && this._missileTimer <= 0) {
       this._missileTimer = MISSILE_COOLDOWN;
       this._spawnMissile(physics, fwd, right, up);
     }

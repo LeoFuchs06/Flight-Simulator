@@ -18,7 +18,7 @@
     <div id="splash">
       <div class="panel">
         <h1>Salzburg Flight Simulator</h1>
-        <p class="subtitle">Wähle deinen Abfangjäger</p>
+        <p class="subtitle">Wähle dein Flugzeug</p>
         <div class="aircraft-select">
           <button class="jet-card" data-jet="eurofighter">
             <span class="badge">EU · 🇪🇺</span>
@@ -35,21 +35,36 @@
             <h2>MiG-25 Foxbat</h2>
             <p>Höhenabfangjäger · Mach 2.83</p>
           </button>
+          <button class="jet-card" data-jet="a10">
+            <span class="badge">USA · 🇺🇸</span>
+            <h2>A-10 Thunderbolt II</h2>
+            <p>Gattling · Panzerabwehr · Mach 0.56</p>
+          </button>
+          <button class="jet-card" data-jet="f22">
+            <span class="badge">USA · 🇺🇸</span>
+            <h2>F-22 Raptor</h2>
+            <p>Stealth · Agil · Mach 2.25</p>
+          </button>
+          <button class="jet-card" data-jet="f35">
+            <span class="badge">USA · 🇺🇸</span>
+            <h2>F-35 Lightning II</h2>
+            <p>Multirole · VTOL · Mach 1.6</p>
+          </button>
         </div>
         <div class="controls-help">
-          <h3>Steuerung (GTA5-Stil)</h3>
+          <h3>Steuerung</h3>
           <div class="grid">
-            <div><kbd>W</kbd>/<kbd>S</kbd> Nick (pitch)</div>
-            <div><kbd>A</kbd>/<kbd>D</kbd> Roll</div>
-            <div><kbd>Q</kbd>/<kbd>E</kbd> Gier (yaw)</div>
-            <div><kbd>Shift</kbd>/<kbd>Ctrl</kbd> Schub +/-</div>
-            <div><kbd>Space</kbd> Bremse</div>
+            <div><kbd>Numpad 8</kbd>/<kbd>5</kbd> Steigen/Sinken</div>
+            <div><kbd>Numpad 4</kbd>/<kbd>6</kbd> Links/Rechts (Roll)</div>
+            <div><kbd>Q</kbd>/<kbd>E</kbd> Gier (Yaw)</div>
+            <div><kbd>W</kbd> Gas</div>
+            <div><kbd>S</kbd> Bremse</div>
+            <div><kbd>G</kbd> Fahrwerk</div>
             <div><kbd>V</kbd> Kamera</div>
             <div><kbd>R</kbd> Reset</div>
-            <div><kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> Jet</div>
-            <div>🖱️ Maus: Umsehen</div>
-            <div>🖱️ LMB: Bordkanone</div>
-            <div>🖱️ RMB: Rakete</div>
+            <div><kbd>1-6</kbd> Jet wechseln</div>
+            <div>🖱️ Rad: Waffe wechseln</div>
+            <div>🖱️ Klick: Feuer</div>
             <div><kbd>Esc</kbd> Maus frei</div>
           </div>
         </div>
@@ -81,6 +96,14 @@
           <span class="label">MACH</span>
           <span id="hud-mach">0.00</span>
         </div>
+        <div class="hud-box">
+          <span class="label">GEAR</span>
+          <span id="hud-gear">UP</span>
+        </div>
+        <div class="hud-box">
+          <span class="label">WPN</span>
+          <span id="hud-weapon">GUN</span>
+        </div>
       </div>
       <div class="hud-row right">
         <div class="hud-box">
@@ -97,6 +120,10 @@
           <span class="label">THROTTLE</span>
           <div class="bar"><div id="hud-throttle-fill"></div></div>
           <span id="hud-throttle">0%</span>
+        </div>
+        <div class="hud-box">
+          <span class="label">FUEL</span>
+          <span id="hud-fuel">50%</span>
         </div>
       </div>
       <div id="crosshair">+</div>

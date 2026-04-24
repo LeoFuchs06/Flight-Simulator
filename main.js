@@ -7,6 +7,29 @@ import { HUD } from './src/hud.js';
 import { WeaponSystem } from './src/weapons.js';
 import { overlayRealSalzburg } from './src/realWorld.js';
 
+// Input configuration - centralized key bindings
+const INPUT_CONFIG = {
+  pitch: { up: 'Numpad8', down: 'Numpad5' },
+  roll: { left: 'Numpad4', right: 'Numpad6' },
+  yaw: { left: 'KeyQ', right: 'KeyE' },
+  throttle: { up: 'KeyW', down: 'KeyS' },
+  brake: 'Space',
+  gear: 'KeyG',
+  fireGun: 'MouseLeft',
+  fireMissile: 'MouseRight',
+  weaponCycle: 'MouseWheel',
+  camera: 'KeyV',
+  reset: 'KeyR',
+  jetSelect: {
+    'Digit1': 'eurofighter',
+    'Digit2': 'mig31',
+    'Digit3': 'mig25',
+    'Digit4': 'a10',
+    'Digit5': 'f22',
+    'Digit6': 'f35',
+  }
+};
+
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -38,16 +61,24 @@ let aircraft = createAircraft(currentType);
 scene.add(aircraft.group);
 
 const physics = new Physics(aircraft);
+physics._groundAt = world.groundAt; // ground support for runway roll
 const cameraRig = new CameraRig(camera, aircraft.group);
 const hud = new HUD();
 
+// Runway 34 threshold (south end), heading 340° (20° west of north)
+// Airport center at world (-1200, 420, 3200), runway direction sin(-20°)/cos(-20°)
+const RUNWAY_POS = new THREE.Vector3(-773, 423, 2025);
+const RUNWAY_HEADING = 340;
+
 function spawn() {
+  physics.gearDeployed = true;
   physics.reset({
-    position: new THREE.Vector3(-1200, 800, 3200),
-    headingDeg: 170,
-    speed: 400 / 3.6,
-    throttle: 0.6,
+    position: RUNWAY_POS.clone(),
+    headingDeg: RUNWAY_HEADING,
+    speed: 0,
+    throttle: 0,
   });
+  updateGearVisuals(aircraft.group, true);
 }
 spawn();
 
@@ -57,14 +88,25 @@ const mouseBtn = { left: false, right: false };
 
 window.addEventListener('keydown', (e) => {
   keys.add(e.code);
-  if (e.code === 'KeyV') cameraRig.cycle();
-  if (e.code === 'KeyR') spawn();
-  if (e.code === 'Digit1') switchJet('eurofighter');
-  if (e.code === 'Digit2') switchJet('mig31');
-  if (e.code === 'Digit3') switchJet('mig25');
-  if (e.code === 'Space') e.preventDefault();
+  if (e.code === INPUT_CONFIG.camera) cameraRig.cycle();
+  if (e.code === INPUT_CONFIG.reset) spawn();
+  if (e.code === INPUT_CONFIG.gear) {
+    physics.gearDeployed = !physics.gearDeployed;
+    updateGearVisuals(aircraft.group, physics.gearDeployed);
+  }
+  if (INPUT_CONFIG.jetSelect[e.code]) switchJet(INPUT_CONFIG.jetSelect[e.code]);
+  if (e.code === INPUT_CONFIG.brake || e.code === INPUT_CONFIG.throttle.down) e.preventDefault();
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+// Mousewheel for weapon cycling
+window.addEventListener('wheel', (e) => {
+  if (document.pointerLockElement === canvas) {
+    e.preventDefault();
+    weapons.cycleWeapon();
+    hud.setWeapon(weapons.currentWeapon);
+  }
+}, { passive: false });
 
 // GTA5-style mouse: pointer lock on canvas click, mouse moves camera look
 canvas.addEventListener('click', () => {
@@ -94,9 +136,18 @@ function switchJet(type) {
   aircraft = createAircraft(type);
   scene.add(aircraft.group);
   physics.bindAircraft(aircraft);
+  physics._groundAt = world.groundAt;
   cameraRig.bindTarget(aircraft.group);
   physics.restore(oldState);
+  updateGearVisuals(aircraft.group, physics.gearDeployed);
   hud.setJetName(AIRCRAFT_SPECS[type].displayName);
+}
+
+function updateGearVisuals(group, deployed) {
+  group.traverse((child) => {
+    if (child.userData?.isLandingGear)    child.visible = deployed;
+    if (child.userData?.isLandingGearOff) child.visible = !deployed;
+  });
 }
 
 // --- Splash selection ---
@@ -130,12 +181,12 @@ function frame(now) {
   last = now;
   if (running) {
     const input = {
-      pitch: (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0),
-      roll: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
-      yaw: (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0),
-      throttleUp: keys.has('ShiftLeft') || keys.has('ShiftRight'),
-      throttleDown: keys.has('ControlLeft') || keys.has('ControlRight'),
-      brake: keys.has('Space'),
+      pitch: (keys.has(INPUT_CONFIG.pitch.up) ? 1 : 0) - (keys.has(INPUT_CONFIG.pitch.down) ? 1 : 0),
+      roll: (keys.has(INPUT_CONFIG.roll.left) ? 1 : 0) - (keys.has(INPUT_CONFIG.roll.right) ? 1 : 0),
+      yaw: (keys.has(INPUT_CONFIG.yaw.right) ? 1 : 0) - (keys.has(INPUT_CONFIG.yaw.left) ? 1 : 0),
+      throttleUp: keys.has(INPUT_CONFIG.throttle.up),
+      throttleDown: keys.has(INPUT_CONFIG.throttle.down),
+      brake: keys.has(INPUT_CONFIG.brake),
       fireGun: mouseBtn.left,
       fireMissile: mouseBtn.right,
     };
@@ -143,7 +194,11 @@ function frame(now) {
     weapons.update(dt, physics, input);
     cameraRig.update(dt, physics);
     hud.update(physics);
-    if (physics.position.y < world.groundAt(physics.position.x, physics.position.z) + 3) {
+    const groundH = world.groundAt(physics.position.x, physics.position.z);
+    const gearUp = !physics.gearDeployed;
+    const hitGround = gearUp && physics.position.y < groundH + 3;
+    const underground = physics.position.y < groundH - 3;
+    if (hitGround || underground) {
       hud.flashCrash();
       spawn();
     }

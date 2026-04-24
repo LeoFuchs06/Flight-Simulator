@@ -8,6 +8,9 @@ export class HUD {
       hdg: document.getElementById('hud-hdg'),
       throttle: document.getElementById('hud-throttle'),
       throttleFill: document.getElementById('hud-throttle-fill'),
+      gear: document.getElementById('hud-gear'),
+      fuel: document.getElementById('hud-fuel'),
+      weapon: document.getElementById('hud-weapon'),
       root: document.getElementById('hud'),
     };
     this._crashOverlay = null;
@@ -17,16 +20,29 @@ export class HUD {
     if (this.el.jet) this.el.jet.textContent = name;
   }
 
+  setWeapon(weapon) {
+    if (this.el.weapon) this.el.weapon.textContent = weapon.toUpperCase();
+  }
+
   update(physics) {
     const speedKmh = Math.max(0, Math.round(physics.speed * 3.6));
     this.el.speed.textContent = speedKmh;
     this.el.mach.textContent = physics.mach.toFixed(2);
     this.el.alt.textContent = Math.round(physics.altitude);
     this.el.hdg.textContent = String(Math.round(physics.headingDeg) % 360).padStart(3, '0');
+
     const pct = Math.round(physics.throttle * 100);
-    this.el.throttle.textContent = pct + '%';
-    this.el.throttleFill.style.width = pct + '%';
+    const ab  = physics.afterburner;
+    this.el.throttle.textContent = ab ? 'AB' : pct + '%';
+    this.el.throttleFill.style.width      = pct + '%';
+    // Orange bar when afterburner is active, default green otherwise
+    this.el.throttleFill.style.background = ab ? 'rgba(255,110,20,0.9)' : '';
+
     this.el.root.classList.toggle('stall', physics.stalling);
+    this.el.root.classList.toggle('afterburner', ab);
+
+    if (this.el.gear) this.el.gear.textContent = physics.gearDeployed ? 'DOWN' : 'UP';
+    if (this.el.fuel) this.el.fuel.textContent = Math.round(physics.fuelPct * 100) + '%';
   }
 
   flashCrash() {
