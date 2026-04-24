@@ -5,7 +5,6 @@ import { Physics } from './src/physics.js';
 import { CameraRig } from './src/camera.js';
 import { HUD } from './src/hud.js';
 import { WeaponSystem } from './src/weapons.js';
-import { overlayRealSalzburg } from './src/realWorld.js';
 import { buildSky } from './src/sky.js';
 import { buildComposer } from './src/postfx.js';
 import { Contrails } from './src/contrails.js';
@@ -45,7 +44,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xb8d0e5, 3000, 22000);
+scene.fog = new THREE.Fog(0x9fd8f0, 14000, 40000);
 
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 50000);
 
@@ -71,11 +70,6 @@ const sfx = new SfxAudio(engineAudio);
 const weapons = new WeaponSystem(scene, world.groundAt, sfx);
 const contrails = new Contrails(scene);
 
-// Real Salzburg overlay (async; procedural fallback on failure)
-overlayRealSalzburg(scene, world.groundAt, (msg) => {
-  const el = document.getElementById('hud-world');
-  if (el) el.textContent = msg;
-});
 
 // --- Aircraft state ---
 let currentType = 'eurofighter';
@@ -89,8 +83,9 @@ const hud = new HUD();
 
 // Runway 34 threshold (south end), heading 340° (20° west of north)
 // Airport center at world (-1200, 420, 3200), runway direction sin(-20°)/cos(-20°)
-const RUNWAY_POS = new THREE.Vector3(-773, 423, 2025);
-const RUNWAY_HEADING = 340;
+// Runway 36 south threshold — heading 000 (north)
+const RUNWAY_POS = new THREE.Vector3(0, 1, -1500);
+const RUNWAY_HEADING = 0;
 
 function spawn() {
   physics.gearDeployed = true;
