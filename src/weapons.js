@@ -9,9 +9,10 @@ const MISSILE_LIFE = 9;
 const MISSILE_COOLDOWN = 0.8;
 
 export class WeaponSystem {
-  constructor(scene, groundAt) {
+  constructor(scene, groundAt, sfx = null) {
     this.scene = scene;
     this.groundAt = groundAt;
+    this.sfx = sfx;
     this._tracers = [];
     this._missiles = [];
     this._explosions = [];
@@ -19,13 +20,15 @@ export class WeaponSystem {
     this._missileTimer = 0;
     this.currentWeapon = 'gun'; // 'gun' or 'missile'
     this._tracerMat = new THREE.LineBasicMaterial({
-      color: 0xfff2a0, transparent: true, opacity: 0.9,
+      color: new THREE.Color(3, 2.4, 0.6),
+      transparent: true, opacity: 0.95, toneMapped: false,
     });
     this._smokeMat = new THREE.MeshBasicMaterial({
       color: 0xcfcfcf, transparent: true, opacity: 0.8, depthWrite: false,
     });
     this._fireMat = new THREE.MeshBasicMaterial({
-      color: 0xffb060, transparent: true, opacity: 1, depthWrite: false,
+      color: new THREE.Color(4, 1.8, 0.5),
+      transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
     });
   }
 
@@ -46,10 +49,12 @@ export class WeaponSystem {
       this._gunTimer = GUN_RATE;
       this._spawnTracer(physics, fwd, right, up, +1);
       this._spawnTracer(physics, fwd, right, up, -1);
+      this.sfx?.playGun();
     }
     if (this.currentWeapon === 'missile' && input.fireMissile && this._missileTimer <= 0) {
       this._missileTimer = MISSILE_COOLDOWN;
       this._spawnMissile(physics, fwd, right, up);
+      this.sfx?.playMissile();
     }
 
     this._updateTracers(dt);
@@ -112,7 +117,10 @@ export class WeaponSystem {
     g.add(nose);
     const flame = new THREE.Mesh(
       new THREE.ConeGeometry(0.12, 1.5, 10),
-      new THREE.MeshBasicMaterial({ color: 0xffcc40, transparent: true, opacity: 0.9, depthWrite: false })
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(3.5, 2, 0.6),
+        transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false,
+      })
     );
     flame.rotation.x = -Math.PI / 2;
     flame.position.z = -2.2;
@@ -198,6 +206,7 @@ export class WeaponSystem {
 
   _detonate(pos, groundY) {
     pos.y = Math.max(pos.y, groundY + 0.5);
+    this.sfx?.playExplosion();
     const fire = new THREE.Mesh(new THREE.SphereGeometry(6, 16, 12), this._fireMat.clone());
     fire.position.copy(pos);
     this.scene.add(fire);
